@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: todo-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: todo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:7
+    container_name: todo-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  app:
+    build: .
+    container_name: todo-app
+    depends_on:
+      - postgres
+      - mongo
+    environment:
+      POSTGRES_DSN: host=postgres user=postgres password=postgres dbname=todo port=5432 sslmode=disable
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: todo
+      JWT_SECRET: supersecret
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
+  mongodata:
