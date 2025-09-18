@@ -1,8 +1,8 @@
 package db
 
 import (
-	"log"
 	"fmt"
+	"log"
 	"os"
 
 	"gorm.io/driver/postgres"
@@ -11,9 +11,8 @@ import (
 
 var PG *gorm.DB
 
-
 func ConnectPostgres() {
-
+	// Формируем DSN на основе .env
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
@@ -22,11 +21,16 @@ func ConnectPostgres() {
 		os.Getenv("DB_NAME"),
 		os.Getenv("DB_PORT"),
 	)
-	var err error
 
-	PG, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-
-	if err != nil {
-		log.Fatalf("Postgre conncet error %s", err)
+	if dsn == "" {
+		log.Fatal("Postgres DSN is empty! Проверь .env или docker-compose")
 	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Postgres connect error: %v", err)
+	}
+
+	PG = db
+	log.Println("✅ Connected to Postgres")
 }

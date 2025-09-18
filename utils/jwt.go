@@ -1,6 +1,7 @@
 package utils
 
 import (
+	
 	"os"
 	"strconv"
 	"time"
@@ -8,19 +9,16 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-var secret = []byte(getEnv("JWT_SECRET","something"))
+var secret = []byte(getEnv("JWT_SECRET", "something"))
 
 type Claims struct {
-
-	UserID  uint `json:"user_id"`
+	UserID uint `json:"user_id"`
 	jwt.RegisteredClaims
-
 }
 
-func GenerateJWT(userID uint) (string, error){
-
-    ttlHours, _ := strconv.Atoi(getEnv("JWT_TTL_HOURS","24"))
-	exp := time.Now().Add(time.Duration(ttlHours)*time.Hour)
+func GenerateJWT(userID uint) (string, error) {
+	ttlHours, _ := strconv.Atoi(getEnv("JWT_TTL_HOURS", "24"))
+	exp := time.Now().Add(time.Duration(ttlHours) * time.Hour)
 
 	claims := &Claims{
 		UserID: userID,
@@ -29,10 +27,10 @@ func GenerateJWT(userID uint) (string, error){
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	// ✅ Используем HS256, а не ES256
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString(secret)
-
 }
 
 func ParseJWT(tokenStr string) (*Claims, error) {
@@ -52,4 +50,3 @@ func getEnv(key, def string) string {
 	}
 	return def
 }
-

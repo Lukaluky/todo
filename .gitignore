@@ -1,27 +1,18 @@
-# Go build outputs
+# Binaries
+/server
 *.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
 *.out
 
-# Dependency directories
-vendor/
+# Vendor
+/vendor/
 
-# Environment variables
+# IDE
+.vscode/
+.idea/
+
+# Env files
 .env
 
 # Docker
-*.log
-docker-compose.override.yml
-
-# IDE / Editor
-.vscode/
-.idea/
-*.swp
-
-# OS files
-.DS_Store
-Thumbs.db
+pgdata/
+mongodata/

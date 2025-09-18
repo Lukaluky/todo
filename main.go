@@ -34,6 +34,7 @@ func main() {
 	{
 		api.POST("/", handlers.CreateTask)
 		api.GET("/", handlers.GetTasks)
+		api.GET("/:id", handlers.GetTaskByID)
 		api.PUT("/:id", handlers.UpdateTask)
 		api.DELETE("/:id", handlers.DeleteTask)
 	}
