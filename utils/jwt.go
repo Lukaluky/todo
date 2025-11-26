@@ -27,7 +27,7 @@ func GenerateJWT(userID uint) (string, error) {
 		},
 	}
 
-	// ✅ Используем HS256, а не ES256
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString(secret)

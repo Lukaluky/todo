@@ -19,7 +19,7 @@ func main() {
 	db.ConnectMongo()
 	db.ConnectPostgres()
 
-	if err := db.PG.AutoMigrate(&models.User{}); err != nil {
+	if err := db.PG.AutoMigrate(&models.User{}, &models.RefreshToken{}); err != nil {
 		log.Fatalf("migrate error: %v", err)
 	}
 
@@ -28,7 +28,10 @@ func main() {
 	r.POST("register", handlers.Register)
 	r.POST("login", handlers.Login)
 
-	api := r.Group("tasks", middlewares.Auth())
+	r.POST("/refresh", handlers.Refresh)
+    r.POST("/logout", handlers.Logout)
+
+	api := r.Group("/tasks", middlewares.Auth())
 
 
 	{

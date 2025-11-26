@@ -31,7 +31,22 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "email already exists"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "registered"})
+	access, _ := utils.GenerateJWT(user.ID)
+	refresh, exp, _ := utils.GenerateRefreshToken()
+
+	rt := models.RefreshToken{
+		UserID:    user.ID,
+		Token:     refresh,
+		ExpiresAt: exp,
+	}
+
+	db.PG.Create(&rt)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "registered",
+		"access_token":  access,
+		"refresh_token": refresh,
+	})
 
 
  
@@ -60,7 +75,18 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, _ := utils.GenerateJWT(user.ID)
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	access, _ := utils.GenerateJWT(user.ID)
+	refresh, exp, _ := utils.GenerateRefreshToken()
 
+	rt := models.RefreshToken{
+		UserID:    user.ID,
+		Token:     refresh,
+		ExpiresAt: exp,
+	}
+	db.PG.Create(&rt)
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token":  access,
+		"refresh_token": refresh,
+	})
 }
