@@ -1,7 +1,6 @@
 package utils
 
 import (
-	
 	"os"
 	"strconv"
 	"time"
@@ -24,12 +23,12 @@ func GenerateJWT(userID uint) (string, error) {
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(exp),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
 	}
 
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
 	return token.SignedString(secret)
 }
 

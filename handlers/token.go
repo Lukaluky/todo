@@ -1,65 +1,92 @@
 package handlers
 
 import (
+	
 	"net/http"
 	"time"
 	"todo/db"
-	"todo/models"
 	"todo/utils"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Refresh обновляет access token по refresh token
+// Refresh — обновление access token по refresh cookie.
 func Refresh(c *gin.Context) {
-	var body struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh token required"})
+	refresh, err := c.Cookie(RefreshCookieName)
+	if err != nil || refresh == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh cookie missing"})
 		return
 	}
 
-	var rt models.RefreshToken
-	if err := db.PG.Where("token = ? AND expires_at > ?", body.RefreshToken, time.Now()).First(&rt).Error; err != nil {
+	// Ищем refresh token в Redis
+	userIDstr, err := db.Redis.Get(db.Ctx, "rt:"+refresh).Result()
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired refresh token"})
 		return
 	}
+	uid64, err := strconv.ParseUint(userIDstr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user id in redis"})
+		return
+	}
+	userID := uint(uid64)
 
-	
-	access, err := utils.GenerateJWT(rt.UserID)
+	// Генерируем новый access
+	access, err := utils.GenerateJWT(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot generate access token"})
 		return
 	}
+
+	// Ротация refresh token
+	newRefresh, exp, _ := utils.GenerateRefreshToken()
+
+	pipe := db.Redis.TxPipeline()
+	pipe.Del(db.Ctx, "rt:"+refresh)
+	pipe.Set(db.Ctx, "rt:"+newRefresh, userID, time.Until(exp))
+	_, err = pipe.Exec(db.Ctx)
+
+	if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "redis error"})
+        return
+	}
+	// Устанавливаем новую refresh cookie
+	c.SetCookie(
+		RefreshCookieName,
+		newRefresh,
+		int(time.Until(exp).Seconds()),
+		"/",
+		"",
+		false,
+		true,
+	)
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": access,
 	})
 }
 
-// Logout удаляет refresh token из базы
+// Logout — удаляет refresh cookie и запись в Redis
 func Logout(c *gin.Context) {
-	var body struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh token required"})
+	refresh, err := c.Cookie(RefreshCookieName)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh cookie missing"})
 		return
 	}
 
-	result := db.PG.Where("token = ?", body.RefreshToken).Delete(&models.RefreshToken{})
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot delete token"})
-		return
-	}
+	db.Redis.Del(db.Ctx, "rt:"+refresh)
 
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
-		return
-	}
+	// Удаляем cookie (ставим maxAge = -1)
+	c.SetCookie(
+		RefreshCookieName,
+		"",
+		-1,
+		"/",
+		"",
+		false,
+		true,
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }

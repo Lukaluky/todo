@@ -155,5 +155,8 @@ func DeleteTask(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	  c.JSON(http.StatusOK, gin.H{
+        "message": "task deleted successfully",
+        "task_id": id,
+    })
 }

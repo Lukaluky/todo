@@ -10,7 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    healthcheck:               # <--- ДОБАВИЛИ
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
@@ -25,13 +25,24 @@ services:
     volumes:
       - mongodata:/data/db
 
+  redis:
+    image: redis:7
+    container_name: todo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+
   app:
     build: .
     container_name: todo-app
-    depends_on:                # <--- ОБНОВИЛИ
+    depends_on:
       postgres:
         condition: service_healthy
       mongo:
+        condition: service_started
+      redis:                     # <--- добавляем зависимость
         condition: service_started
     env_file:
       - .env
@@ -41,3 +52,4 @@ services:
 volumes:
   pgdata:
   mongodata:
+  redisdata:

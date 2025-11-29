@@ -18,6 +18,9 @@ func main() {
 	_ = godotenv.Load()
 	db.ConnectMongo()
 	db.ConnectPostgres()
+	if err := db.ConnectRedis(); err != nil {
+        panic(err)
+    }
 
 	if err := db.PG.AutoMigrate(&models.User{}, &models.RefreshToken{}); err != nil {
 		log.Fatalf("migrate error: %v", err)

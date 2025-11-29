@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	
+	"time"
 
 	"todo/db"
 	"todo/models"
@@ -12,7 +12,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const RefreshCookieName = "refresh_token"
 
+// -------------------------- REGISTER ----------------------------
 
 func Register(c *gin.Context) {
 	var input struct {
@@ -22,8 +24,9 @@ func Register(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return 
+		return
 	}
+
 	hash, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	user := models.User{Email: input.Email, Password: string(hash)}
 
@@ -31,27 +34,34 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "email already exists"})
 		return
 	}
+
+	// ---- access token ----
 	access, _ := utils.GenerateJWT(user.ID)
+
+	// ---- refresh token ----
 	refresh, exp, _ := utils.GenerateRefreshToken()
 
-	rt := models.RefreshToken{
-		UserID:    user.ID,
-		Token:     refresh,
-		ExpiresAt: exp,
-	}
+	// ---- Save refresh token in Redis ----
+	db.Redis.Set(c, "rt:"+refresh, user.ID, time.Until(exp))
 
-	db.PG.Create(&rt)
+	// ---- Set refresh as HttpOnly Cookie ----
+	c.SetCookie(
+		RefreshCookieName,
+		refresh,
+		int(time.Until(exp).Seconds()),
+		"/",
+		"",
+		false,  
+		true,   
+	)
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "registered",
-		"access_token":  access,
-		"refresh_token": refresh,
+	c.JSON(200, gin.H{
+		"message":      "registered",
+		"access_token": access,
 	})
-
-
- 
 }
 
+// -------------------------- LOGIN ----------------------------
 
 func Login(c *gin.Context) {
 	var input struct {
@@ -70,23 +80,31 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
+	// ---- Generate tokens ----
 	access, _ := utils.GenerateJWT(user.ID)
 	refresh, exp, _ := utils.GenerateRefreshToken()
 
-	rt := models.RefreshToken{
-		UserID:    user.ID,
-		Token:     refresh,
-		ExpiresAt: exp,
-	}
-	db.PG.Create(&rt)
+	// ---- Save refresh to Redis ----
+	db.Redis.Set(c, "rt:"+refresh, user.ID, time.Until(exp))
 
-	c.JSON(http.StatusOK, gin.H{
-		"access_token":  access,
-		"refresh_token": refresh,
+	// ---- Set cookie ----
+	c.SetCookie(
+		RefreshCookieName,
+		refresh,
+		int(time.Until(exp).Seconds()),
+		"/",
+		"",
+		false,
+		true,
+	)
+
+	c.JSON(200, gin.H{
+		"access_token": access,
 	})
 }
